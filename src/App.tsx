@@ -27,6 +27,7 @@ interface BotStatus {
   inviteLink: string | null;
   isAutoReplyEnabled: boolean;
   preferredChatModel: string;
+  searchKeywords: string[];
   config: {
     discordToken: string;
     discordClientId: string;
@@ -44,6 +45,7 @@ export default function App() {
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingModel, setUpdatingModel] = useState(false);
+  const [newKeyword, setNewKeyword] = useState("");
 
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
@@ -78,6 +80,38 @@ export default function App() {
       }
     } catch (e) {
       console.error("Failed to update model", e);
+    } finally {
+      setUpdatingModel(false);
+    }
+  };
+
+  const addKeyword = async () => {
+    if (!newKeyword.trim() || !status) return;
+    const updatedKeywords = [...status.searchKeywords, newKeyword.trim()];
+    await updateKeywords(updatedKeywords);
+    setNewKeyword("");
+  };
+
+  const removeKeyword = async (kw: string) => {
+    if (!status) return;
+    const updatedKeywords = status.searchKeywords.filter(k => k !== kw);
+    await updateKeywords(updatedKeywords);
+  };
+
+  const updateKeywords = async (keywords: string[]) => {
+    setUpdatingModel(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ searchKeywords: keywords })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(prev => prev ? { ...prev, searchKeywords: data.searchKeywords } : null);
+      }
+    } catch (e) {
+      console.error("Failed to update keywords", e);
     } finally {
       setUpdatingModel(false);
     }
@@ -182,28 +216,28 @@ export default function App() {
                     <MessageSquare className="w-5 h-5 text-indigo-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2">Intelligent Chat</h3>
-                  <p className="text-sm text-slate-400">Use <code className="text-indigo-300 bg-indigo-500/10 px-1 rounded">/chat</code> with <strong>Google Search grounding</strong> for real-time, comprehensive answers.</p>
+                  <p className="text-sm text-slate-400">Use <code className="text-indigo-300 bg-indigo-500/10 px-1 rounded">/chat</code> with <strong>Dynamic Search</strong> for real-time answers.</p>
+                </div>
+                <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-blue-500/30 transition-colors group">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
+                    <Bot className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Deep Thinking</h3>
+                  <p className="text-sm text-slate-400">Use <code className="text-blue-300 bg-blue-500/10 px-1 rounded">/think</code> for complex reasoning using Gemini 3.1 Pro.</p>
+                </div>
+                <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 transition-colors group">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
+                    <ImageIcon className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Image Analysis</h3>
+                  <p className="text-sm text-slate-400"><strong>Upload a photo</strong> and tag the bot to analyze images using Gemini 3.1 Pro.</p>
                 </div>
                 <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-purple-500/30 transition-colors group">
                   <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
                     <ImageIcon className="w-5 h-5 text-purple-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2">Gemini Imagination</h3>
-                  <p className="text-sm text-slate-400">Use <code className="text-purple-300 bg-purple-500/10 px-1 rounded">/imagine</code> to create high-quality images with custom aspect ratios.</p>
-                </div>
-                <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-orange-500/30 transition-colors group">
-                  <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
-                    <ImageIcon className="w-5 h-5 text-orange-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">DALL-E 3</h3>
-                  <p className="text-sm text-slate-400">Use <code className="text-orange-300 bg-orange-500/10 px-1 rounded">/dalle</code> to generate photorealistic images using OpenAI's latest model.</p>
-                </div>
-                <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 transition-colors group">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
-                    <MessageSquare className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">ChatGPT (GPT-4o)</h3>
-                  <p className="text-sm text-slate-400">Use <code className="text-emerald-300 bg-emerald-500/10 px-1 rounded">/chatgpt</code> to interact with OpenAI's latest model.</p>
+                  <p className="text-sm text-slate-400">Use <code className="text-purple-300 bg-purple-500/10 px-1 rounded">/imagine</code> to create high-quality images.</p>
                 </div>
             </section>
 
@@ -276,6 +310,43 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Search Keywords */}
+                <div className="p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Dynamic Search Keywords</h3>
+                  <p className="text-xs text-slate-500 mb-4">When a message contains these words, the bot will enable Google Search for real-time data.</p>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {status?.searchKeywords.map((kw, i) => (
+                      <span key={i} className="flex items-center gap-1 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">
+                        {kw}
+                        <button 
+                          onClick={() => removeKeyword(kw)}
+                          className="hover:text-red-400 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newKeyword}
+                      onChange={(e) => setNewKeyword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
+                      placeholder="Add keyword..."
+                      className="flex-1 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                    <button
+                      onClick={addKeyword}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Configuration Check</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -332,36 +403,6 @@ export default function App() {
                   </div>
                 )}
               
-              <div className="mt-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-                <div className="flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-amber-200">Important: Message Content Intent</p>
-                    <p className="text-xs text-amber-200/70">Ensure "Message Content Intent" is enabled in your Discord Developer Portal under the "Bot" tab. Without this, the bot cannot read your messages.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 p-6 rounded-2xl bg-red-500/5 border border-red-500/20">
-                <h3 className="text-lg font-bold text-red-200 mb-4 flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5" />
-                  API Key Troubleshooting
-                </h3>
-                <ul className="space-y-3 text-sm text-slate-400">
-                  <li className="flex gap-2">
-                    <span className="text-red-400 font-bold">•</span>
-                    <span>If you see <strong>"API key not valid"</strong>, ensure you haven't manually set a broken key in the environment variables.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-red-400 font-bold">•</span>
-                    <span>The platform usually provides a free key automatically. If you are using a paid project, make sure billing is enabled.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-red-400 font-bold">•</span>
-                    <span>Try clicking the <strong>"Test AI Connection"</strong> button above to see the raw error from Google.</span>
-                  </li>
-                </ul>
-              </div>
             </section>
 
             {/* Developer Info Section */}
@@ -406,82 +447,6 @@ export default function App() {
               </div>
             </section>
 
-            {/* Logs Section */}
-            <section className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-6 h-6 text-indigo-400" />
-                  <h2 className="text-2xl font-bold text-white">Activity Logs</h2>
-                </div>
-                <span className="text-xs font-mono text-slate-500 uppercase tracking-widest">Real-time</span>
-              </div>
-
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {status?.logs && status.logs.length > 0 ? (
-                  status.logs.map((log, i) => (
-                    <div key={i} className="flex gap-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 font-mono text-xs">
-                      <span className="text-slate-500 shrink-0">
-                        {new Date(log.timestamp).toLocaleTimeString([], { hour12: false })}
-                      </span>
-                      <span className={cn(
-                        "font-bold shrink-0",
-                        log.level === 'ERROR' ? "text-red-400" : 
-                        log.level === 'WARN' ? "text-amber-400" : "text-indigo-400"
-                      )}>
-                        [{log.level}]
-                      </span>
-                      <span className="text-slate-300 break-all">{log.message}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 text-slate-500 italic text-sm">
-                    No activity logs yet. Interactions will appear here.
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Setup Instructions */}
-            <section className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800">
-              <div className="flex items-center gap-3 mb-6">
-                <Settings className="w-6 h-6 text-indigo-400" />
-                <h2 className="text-2xl font-bold text-white">Setup Instructions</h2>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-indigo-400 border border-slate-700">1</div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-white">Create a Discord Application</h4>
-                    <p className="text-sm text-slate-400">Go to the <a href="https://discord.com/developers/applications" target="_blank" className="text-indigo-400 hover:underline inline-flex items-center gap-1">Discord Developer Portal <ExternalLink className="w-3 h-3" /></a> and create a new application.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-indigo-400 border border-slate-700">2</div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-white">Configure Bot Token</h4>
-                    <p className="text-sm text-slate-400">Navigate to the "Bot" tab, reset the token, and copy it. Add it as <code className="text-indigo-300 bg-indigo-500/10 px-1 rounded">DISCORD_TOKEN</code> in your environment variables.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-indigo-400 border border-slate-700">3</div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-white">Set Client ID</h4>
-                    <p className="text-sm text-slate-400">Copy the "Application ID" from the "General Information" tab and add it as <code className="text-indigo-300 bg-indigo-500/10 px-1 rounded">DISCORD_CLIENT_ID</code>.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-indigo-400 border border-slate-700">5</div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-white">Optional: Auto-Reply Channel</h4>
-                    <p className="text-sm text-slate-400">To make the bot reply to <em>every</em> message in a specific channel, copy that channel's ID and add it as <code className="text-indigo-300 bg-indigo-500/10 px-1 rounded">DISCORD_AUTO_REPLY_CHANNEL_ID</code>. (Enable Developer Mode in Discord settings to copy IDs).</p>
-                  </div>
-                </div>
-              </div>
-            </section>
           </div>
 
           {/* Sidebar / Status */}

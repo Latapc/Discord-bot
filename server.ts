@@ -52,6 +52,7 @@ let botStatus = "Disconnected";
 let botUser = null;
 let isAutoReplyEnabled = true;
 let preferredChatModel = "gemini"; // "gemini" or "chatgpt"
+let searchKeywords = ["search", "latest", "current", "news", "today", "weather", "price", "who is", "what is the", "score", "stock", "update", "recent"];
 let recentLogs: { timestamp: string; level: string; message: string }[] = [];
 
 function addLog(level: string, message: string) {
@@ -92,10 +93,18 @@ async function registerCommands() {
   const commands = [
     new SlashCommandBuilder()
       .setName("chat")
-      .setDescription("Chat with Gemini")
+      .setDescription("Chat with Gemini (Smart Routing)")
       .addStringOption(option =>
         option.setName("message")
           .setDescription("The message to send")
+          .setRequired(true)
+      ),
+    new SlashCommandBuilder()
+      .setName("think")
+      .setDescription("Deep reasoning for complex queries (Gemini 3.1 Pro)")
+      .addStringOption(option =>
+        option.setName("message")
+          .setDescription("The complex query to solve")
           .setRequired(true)
       ),
     new SlashCommandBuilder()
@@ -199,20 +208,52 @@ client.on("messageCreate", async (message) => {
     prompt = prompt.replace(new RegExp(`<@!?${client.user.id}>`, "g"), "").trim();
   }
 
-  if (!prompt && isMentioned) {
-    await message.reply("Hello! How can I help you today? You can ask me questions or use `/imagine` to generate images.");
+  const hasImage = message.attachments.size > 0 && message.attachments.first()?.contentType?.startsWith("image/");
+
+  if (!prompt && isMentioned && !hasImage) {
+    await message.reply("Hello! How can I help you today? You can ask me questions, use `/imagine` to generate images, or **upload a photo** for me to analyze!");
     return;
   }
 
-  if (!prompt) return; // Don't reply to empty messages in auto-reply channel
-
   try {
-    addLog("INFO", `Processing message from ${message.author.tag}: ${prompt.substring(0, 50)}...`);
     const ai = getGenAI();
+    
+    if (hasImage) {
+      addLog("INFO", `Analyzing image from ${message.author.tag}`);
+      const attachment = message.attachments.first()!;
+      const response = await fetch(attachment.url);
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: {
+          parts: [
+            { inlineData: { data: base64, mimeType: attachment.contentType! } },
+            { text: prompt || "What is in this image? Describe it in detail." }
+          ]
+        }
+      });
+      
+      const reply = result.text || "I analyzed the image but couldn't generate a description.";
+      await message.reply(reply.length > 2000 ? reply.substring(0, 1997) + "..." : reply);
+      return;
+    }
+
+    if (!prompt) return;
+
+    addLog("INFO", `Processing message from ${message.author.tag}: ${prompt.substring(0, 50)}...`);
+    
+    // Dynamic Search Detection
+    const needsSearch = searchKeywords.some(kw => prompt.toLowerCase().includes(kw.toLowerCase()));
+    
     const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+      config: { 
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        tools: needsSearch ? [{ googleSearch: {} }] : []
+      }
     });
     const response = result.text;
 
@@ -266,9 +307,8 @@ client.on("interactionCreate", async (interaction) => {
         const ai = getGenAI();
         const prompt = message || "";
         
-        // Dynamic Search Detection: Only use search if keywords suggest real-time info is needed
-        const searchKeywords = ["search", "latest", "current", "news", "today", "weather", "price", "who is", "what is the", "score", "stock"];
-        const needsSearch = searchKeywords.some(kw => prompt.toLowerCase().includes(kw));
+        // Dynamic Search Detection
+        const needsSearch = searchKeywords.some(kw => prompt.toLowerCase().includes(kw.toLowerCase()));
         
         const result = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
@@ -293,6 +333,36 @@ client.on("interactionCreate", async (interaction) => {
       }
     } catch (error: any) {
       addLog("ERROR", `Error in /chat handler (${preferredChatModel}): ${error.message}`);
+      await interaction.editReply(`Sorry, I encountered an error: ${error.message || "Unknown error"}`);
+    }
+  }
+
+  if (interaction.commandName === "think") {
+    await interaction.deferReply();
+    const message = interaction.options.getString("message");
+    
+    try {
+      addLog("INFO", `Processing /think (Gemini 3.1 Pro) from ${interaction.user.tag}`);
+      const ai = getGenAI();
+      const result = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: message || "",
+        config: { 
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
+        }
+      });
+      const response = result.text;
+      
+      if (response && response.length > 2000) {
+        await interaction.editReply(response.substring(0, 1997) + "...");
+      } else if (response) {
+        await interaction.editReply(response);
+      } else {
+        addLog("WARN", "Gemini Pro returned empty text response for /think.");
+        await interaction.editReply("The model returned an empty response.");
+      }
+    } catch (error: any) {
+      addLog("ERROR", `Error in /think handler: ${error.message}`);
       await interaction.editReply(`Sorry, I encountered an error: ${error.message || "Unknown error"}`);
     }
   }
@@ -456,6 +526,7 @@ app.get("/api/status", (req, res) => {
     inviteLink,
     isAutoReplyEnabled,
     preferredChatModel,
+    searchKeywords,
     config: {
       discordToken: mask(process.env.DISCORD_TOKEN),
       discordClientId: mask(process.env.DISCORD_CLIENT_ID),
@@ -471,14 +542,19 @@ app.get("/api/status", (req, res) => {
 });
 
 app.post("/api/settings", (req, res) => {
-  const { preferredChatModel: newModel } = req.body;
+  const { preferredChatModel: newModel, searchKeywords: newKeywords } = req.body;
+  
   if (newModel === "gemini" || newModel === "chatgpt") {
     preferredChatModel = newModel;
     addLog("INFO", `Preferred chat model updated to: ${newModel}`);
-    res.json({ success: true, preferredChatModel });
-  } else {
-    res.status(400).json({ success: false, error: "Invalid model selection" });
   }
+
+  if (Array.isArray(newKeywords)) {
+    searchKeywords = newKeywords.map(k => String(k).trim()).filter(k => k.length > 0);
+    addLog("INFO", `Search keywords updated: ${searchKeywords.join(", ")}`);
+  }
+
+  res.json({ success: true, preferredChatModel, searchKeywords });
 });
 
 async function startServer() {
