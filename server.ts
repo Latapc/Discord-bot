@@ -264,15 +264,22 @@ client.on("interactionCreate", async (interaction) => {
         response = completion.choices[0].message.content || "";
       } else {
         const ai = getGenAI();
+        const prompt = message || "";
+        
+        // Dynamic Search Detection: Only use search if keywords suggest real-time info is needed
+        const searchKeywords = ["search", "latest", "current", "news", "today", "weather", "price", "who is", "what is the", "score", "stock"];
+        const needsSearch = searchKeywords.some(kw => prompt.toLowerCase().includes(kw));
+        
         const result = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
-          contents: message || "",
+          contents: prompt,
           config: { 
             thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-            tools: [{ googleSearch: {} }]
+            tools: needsSearch ? [{ googleSearch: {} }] : []
           }
         });
         response = result.text || "";
+        if (needsSearch) addLog("DEBUG", "Google Search was enabled for this query.");
       }
       
       // Discord has a 2000 character limit
