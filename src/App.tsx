@@ -1,6 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { Bot, MessageSquare, Image as ImageIcon, Settings, ExternalLink, AlertCircle, CheckCircle2, Shield, Mic, Square, Loader2 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { useEffect, useState } from 'react';
+import { Bot, MessageSquare, Image as ImageIcon, Settings, ExternalLink, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -50,13 +49,6 @@ export default function App() {
 
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
-
-  // Voice Transcription State
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState("");
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const testAI = async () => {
     setTesting(true);
@@ -132,73 +124,6 @@ export default function App() {
       window.location.reload();
     } else {
       alert("API Key selection is only available in the AI Studio environment.");
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await transcribeAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setTranscription("");
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      alert("Could not access microphone. Please check permissions.");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const transcribeAudio = async (blob: Blob) => {
-    setIsTranscribing(true);
-    try {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        
-        // Use the Gemini API directly from frontend
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [
-            {
-              parts: [
-                { inlineData: { data: base64Audio, mimeType: 'audio/webm' } },
-                { text: "Please transcribe this audio accurately." }
-              ]
-            }
-          ]
-        });
-
-        setTranscription(response.text || "No transcription available.");
-      };
-    } catch (err) {
-      console.error("Transcription error:", err);
-      setTranscription("Error during transcription.");
-    } finally {
-      setIsTranscribing(false);
     }
   };
 
@@ -314,66 +239,6 @@ export default function App() {
                   <h3 className="text-lg font-semibold text-white mb-2">Gemini Imagination</h3>
                   <p className="text-sm text-slate-400">Use <code className="text-purple-300 bg-purple-500/10 px-1 rounded">/imagine</code> to create high-quality images.</p>
                 </div>
-                <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-amber-500/30 transition-colors group">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center mb-4 group-hover:bg-amber-500/20 transition-colors">
-                    <Mic className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Voice Transcription</h3>
-                  <p className="text-sm text-slate-400">Use the <strong>Voice Lab</strong> below to transcribe your speech into text instantly.</p>
-                </div>
-            </section>
-
-            {/* Voice Transcription Section */}
-            <section className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg bg-amber-500/10">
-                  <Mic className="w-6 h-6 text-amber-400" />
-                </div>
-                <h2 className="text-2xl font-bold text-white">Voice Lab</h2>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex flex-col items-center justify-center p-12 rounded-2xl bg-slate-800/30 border border-slate-700/50 border-dashed">
-                  {isRecording ? (
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-red-500/20 rounded-full animate-ping" />
-                        <button
-                          onClick={stopRecording}
-                          className="relative w-20 h-20 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/40 hover:bg-red-600 transition-colors"
-                        >
-                          <Square className="w-8 h-8 fill-current" />
-                        </button>
-                      </div>
-                      <p className="text-red-400 font-medium animate-pulse">Recording... Click to stop</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-4">
-                      <button
-                        onClick={startRecording}
-                        className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/40 hover:bg-indigo-500 transition-colors"
-                      >
-                        <Mic className="w-8 h-8" />
-                      </button>
-                      <p className="text-slate-400 font-medium">Click to start recording</p>
-                    </div>
-                  )}
-                </div>
-
-                {isTranscribing && (
-                  <div className="flex items-center justify-center gap-3 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20">
-                    <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
-                    <p className="text-sm text-indigo-300">Gemini is transcribing your audio...</p>
-                  </div>
-                )}
-
-                {transcription && (
-                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Transcription Result</h4>
-                    <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">{transcription}</p>
-                  </div>
-                )}
-              </div>
             </section>
 
             {/* Invite Section */}
