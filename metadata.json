@@ -1,5 +1,5 @@
 {
   "name": "Gemini Discord Bot",
   "description": "A powerful Discord bot that uses Gemini for chatting, Q&A, and AI image generation.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["microphone"]
 }

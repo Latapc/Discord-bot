@@ -146,6 +146,14 @@ async function registerCommands() {
           )
       ),
     new SlashCommandBuilder()
+      .setName("transcribe")
+      .setDescription("Transcribe an audio file using Gemini")
+      .addAttachmentOption(option =>
+        option.setName("audio")
+          .setDescription("The audio file to transcribe")
+          .setRequired(true)
+      ),
+    new SlashCommandBuilder()
       .setName("dalle")
       .setDescription("Generate an image using OpenAI DALL-E 3")
       .addStringOption(option =>
@@ -447,6 +455,47 @@ client.on("interactionCreate", async (interaction) => {
       let userMessage = `Sorry, I encountered an error while generating the image: ${error.message || "Unknown error"}`;
       if (error.message?.includes("safety")) userMessage = "I cannot generate that image due to safety guidelines.";
       await interaction.editReply(userMessage);
+    }
+  }
+
+  if (interaction.commandName === "transcribe") {
+    await interaction.deferReply();
+    const attachment = interaction.options.getAttachment("audio");
+    
+    if (!attachment || !attachment.contentType?.startsWith("audio/")) {
+      await interaction.editReply("Please provide a valid audio file.");
+      return;
+    }
+
+    try {
+      addLog("INFO", `Processing /transcribe from ${interaction.user.tag}`);
+      const response = await fetch(attachment.url);
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+
+      const ai = getGenAI();
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            parts: [
+              { inlineData: { data: base64, mimeType: attachment.contentType } },
+              { text: "Please transcribe this audio accurately." }
+            ]
+          }
+        ]
+      });
+
+      const transcription = result.text || "No transcription available.";
+      
+      if (transcription.length > 2000) {
+        await interaction.editReply(transcription.substring(0, 1997) + "...");
+      } else {
+        await interaction.editReply(transcription);
+      }
+    } catch (error: any) {
+      addLog("ERROR", `Error in /transcribe handler: ${error.message}`);
+      await interaction.editReply(`Sorry, I encountered an error: ${error.message || "Unknown error"}`);
     }
   }
 
