@@ -145,7 +145,8 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const appUrl = window.location.origin;
+  const isVercel = typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app');
+  const isBackendUnreachable = !loading && !status;
 
   return (
     <div className="min-h-screen bg-[#0F1115] text-slate-200 font-sans selection:bg-indigo-500/30">
@@ -209,6 +210,67 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Vercel Warning */}
+            {isVercel && (
+              <motion.section 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <AlertCircle className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold text-white">Vercel Deployment Detected</h2>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      Vercel is a <strong>serverless</strong> platform. Discord bots require a <strong>persistent</strong> server to stay online. 
+                      Your bot will appear offline because Vercel kills the process after each request.
+                    </p>
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      <a 
+                        href="https://railway.app" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                      >
+                        Try Railway <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <a 
+                        href="https://render.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                      >
+                        Try Render <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
+            {/* Backend Unreachable Warning */}
+            {isBackendUnreachable && (
+              <motion.section 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 rounded-3xl bg-red-500/10 border border-red-500/20"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-2 rounded-lg bg-red-500/20">
+                    <AlertCircle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold text-white">Backend Unreachable</h2>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      The dashboard cannot connect to the bot's backend API. This usually means the server is not running or the API routes are not configured correctly for your hosting provider.
+                    </p>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
             {/* Features */}
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-indigo-500/30 transition-colors group">
@@ -405,6 +467,50 @@ export default function App() {
               
             </section>
 
+            {/* Deployment Guide Section */}
+            <section className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-indigo-500/10">
+                  <ExternalLink className="w-6 h-6 text-indigo-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Deployment Guide</h2>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50">
+                  <h3 className="text-lg font-semibold text-white mb-4">How to keep your bot online 24/7</h3>
+                  <div className="space-y-4">
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 text-indigo-400 font-bold text-sm">1</div>
+                      <p className="text-sm text-slate-400">
+                        <strong>Choose a Persistent Host:</strong> Use a provider that supports long-running Node.js processes. 
+                        Recommended: <a href="https://railway.app" className="text-indigo-400 hover:underline">Railway</a>, 
+                        <a href="https://render.com" className="text-indigo-400 hover:underline">Render</a>, or a VPS (DigitalOcean, Linode).
+                      </p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 text-indigo-400 font-bold text-sm">2</div>
+                      <p className="text-sm text-slate-400">
+                        <strong>Set Environment Variables:</strong> Ensure all secrets (DISCORD_TOKEN, GEMINI_API_KEY, etc.) are added to your host's dashboard.
+                      </p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 text-indigo-400 font-bold text-sm">3</div>
+                      <p className="text-sm text-slate-400">
+                        <strong>Build Command:</strong> Set your build command to <code className="bg-slate-800 px-1 rounded text-indigo-300">npm run build</code>.
+                      </p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 text-indigo-400 font-bold text-sm">4</div>
+                      <p className="text-sm text-slate-400">
+                        <strong>Start Command:</strong> Set your start command to <code className="bg-slate-800 px-1 rounded text-indigo-300">node server.ts</code> (or use the provided <code className="bg-slate-800 px-1 rounded text-indigo-300">npm start</code>).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* Developer Info Section */}
             <section className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800">
               <div className="flex items-center gap-3 mb-6">
@@ -504,6 +610,11 @@ export default function App() {
                       <>
                         <span className="text-xs font-medium text-emerald-400">Connected</span>
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      </>
+                    ) : status?.status === 'Vercel (Serverless)' ? (
+                      <>
+                        <span className="text-xs font-medium text-amber-400">Vercel (Limited)</span>
+                        <AlertCircle className="w-4 h-4 text-amber-500" />
                       </>
                     ) : (
                       <>

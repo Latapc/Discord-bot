@@ -48,7 +48,7 @@ const getOpenAI = () => {
 };
 
 // Bot Status and Logs
-let botStatus = "Disconnected";
+let botStatus = process.env.VERCEL ? "Vercel (Serverless)" : "Disconnected";
 let botUser = null;
 let isAutoReplyEnabled = true;
 let preferredChatModel = "gemini"; // "gemini" or "chatgpt"
